@@ -1,28 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
+using BrainDump.data;
 using BrainDump.Models;
+using BrainDump.util;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BrainDump.Controllers {
     [Route("api/[controller]")]
     public class PostsController : Controller {
-        private readonly BrainDumpContext _context;
+        private readonly Random _random;
+        private readonly IPostsRepository _posts;
 
-        public PostsController(BrainDumpContext context) {
-            _context = context;
+        public PostsController(MongoDataAccess dataAccess, Random random) {
+            _random = random;
+            _posts = dataAccess.GetPostsRepository();
         }
 
         [HttpGet]
         public IEnumerable<BlogPost> Get() {
             // TODO: Remove this method
-            return _context.BlogPosts;
+            return _posts.GetAll();
         }
 
         [HttpGet("{id}", Name = "GetBlogPost")]
         public IActionResult Get(long id) {
-            var blogPost = _context.BlogPosts.Find(id);
+            var blogPost = _posts.Find(id);
             if (blogPost == null) {
                 return NotFound();
             } else {
@@ -35,11 +40,10 @@ namespace BrainDump.Controllers {
             if (submission == null) {
                 return BadRequest();
             }
+            
+            var blogPost = new BlogPost(_random.NextPositiveLong(), submission);
 
-            var blogPost = new BlogPost(submission);
-
-            _context.BlogPosts.Add(blogPost);
-            _context.SaveChanges();
+            _posts.Add(blogPost);
 
             return CreatedAtRoute("GetBlogPost", new { id = blogPost.Id }, blogPost);
         }
