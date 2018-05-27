@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BrainDump.Controllers;
 using BrainDump.Models;
+using BrainDump.Models.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +31,8 @@ namespace BrainDump {
         public void ConfigureServices(IServiceCollection services) {
             services.AddSingleton(Configuration);
             services.AddSingleton(new Random());
+            services.AddSingleton(new RNGCryptoServiceProvider());
+            services.AddSingleton<AuthorizationManager>();
             services.AddTransient<MongoDataAccess>();
             services.AddMvc();
         }

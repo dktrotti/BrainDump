@@ -1,25 +1,42 @@
 ﻿using BrainDump.data;
+using BrainDump.Models.Auth;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 
 namespace BrainDump.Models {
     public class MongoDataAccess {
-        private IMongoDatabase _database;
+        private readonly IMongoDatabase _mainDatabase;
+        private readonly IMongoDatabase _authDatabase;
 
         public MongoDataAccess(IConfiguration configuration) {
-            var connectionString = configuration["mongoConnectionString"];
-            var dbName = configuration["mongoDatabaseName"];
+            var mainConnectionString = configuration["mainConnectionString"];
+            var mainDbName = configuration["mainDatabaseName"];
+            var authConnectionString = configuration["authConnectionString"];
+            var authDbName = configuration["authDatabaseName"];
 
-            var client = new MongoClient(connectionString);
-            _database = client.GetDatabase(dbName);
+            var mainClient = new MongoClient(mainConnectionString);
+            _mainDatabase = mainClient.GetDatabase(mainDbName);
+            var authClient = new MongoClient(authConnectionString);
+            _authDatabase = authClient.GetDatabase(authDbName);
 
-            _database.GetCollection<BlogPost>("posts").Indexes.CreateOne(
+            _mainDatabase.GetCollection<BlogPost>("posts").Indexes.CreateOne(
                 Builders<BlogPost>.IndexKeys.Ascending(_ => _.PostId),
                 new CreateIndexOptions<BlogPost>() {Unique = true});
+
+            _authDatabase.GetCollection<User>("users").Indexes.CreateOne(
+                Builders<User>.IndexKeys.Ascending(_ => _.UserId),
+                new CreateIndexOptions<User>() { Unique = true });
+            _authDatabase.GetCollection<User>("users").Indexes.CreateOne(
+                Builders<User>.IndexKeys.Ascending(_ => _.UserName),
+                new CreateIndexOptions<User>() { Unique = true });
         }
 
         public IPostsRepository GetPostsRepository() {
-            return new PostsRepository(_database.GetCollection<BlogPost>("posts"));
+            return new PostsRepository(_mainDatabase.GetCollection<BlogPost>("posts"));
+        }
+
+        public IUserRepository GetUserRepository() {
+            return new UserRepository(_authDatabase.GetCollection<User>("users"));
         }
     }
 }

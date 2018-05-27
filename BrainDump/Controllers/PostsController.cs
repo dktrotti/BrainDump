@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using BrainDump.data;
 using BrainDump.Models;
 using BrainDump.util;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BrainDump.Controllers {
+    [Produces("application/json")]
     [Route("api/[controller]")]
     public class PostsController : Controller {
         private readonly Random _random;
@@ -35,6 +38,7 @@ namespace BrainDump.Controllers {
             }
         }
         
+        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] BlogPostSubmission submission) {
             if (submission == null) {
@@ -47,7 +51,8 @@ namespace BrainDump.Controllers {
 
             return CreatedAtRoute("GetBlogPost", new { id = blogPost.Id }, blogPost);
         }
-        
+
+        [Authorize]
         [HttpDelete("{id}")]
         public void Delete(int id) {
         }
