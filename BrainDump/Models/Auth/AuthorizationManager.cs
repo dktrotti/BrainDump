@@ -76,10 +76,14 @@ namespace BrainDump.Models.Auth {
             return new JwtSecurityToken(
                 claims: new List<Claim> {
                     new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim("bdUserId", user.UserId.ToString())
+                    new Claim(CustomClaims.BraindumpUserId, user.UserId.ToString())
                 },
                 signingCredentials: creds);
         }
+    }
+
+    public static class CustomClaims {
+        public const String BraindumpUserId = "bdUserId";
     }
 
     public class InvalidCredentialsException : Exception {

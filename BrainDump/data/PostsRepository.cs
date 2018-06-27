@@ -26,7 +26,7 @@ namespace BrainDump.data {
         }
 
         public void Remove(long key) {
-            throw new NotImplementedException();
+            _posts.DeleteOne(p => p.PostId == key);
         }
 
         public void Update(BlogPost item) {

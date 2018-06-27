@@ -45,12 +45,12 @@ namespace BrainDump.Models {
             UserId = userId;
         }
 
-        public BlogPost(long postId, BlogPostSubmission submission) {
+        public BlogPost(long postId, long userId, BlogPostSubmission submission) {
             PostId = postId;
             CreationTime = DateTime.UtcNow;
             Title = submission.Title;
             Body = submission.Body;
-            UserId = null;
+            UserId = userId;
         }
     }
 }

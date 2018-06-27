@@ -6,8 +6,10 @@ using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using BrainDump.data;
 using BrainDump.Models;
+using BrainDump.Models.Auth;
 using BrainDump.util;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BrainDump.Controllers {
@@ -41,11 +43,12 @@ namespace BrainDump.Controllers {
         [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] BlogPostSubmission submission) {
-            if (submission == null) {
+            var userId = HttpContext.GetUserId();
+            if (submission == null || userId == null) {
                 return BadRequest();
             }
-            
-            var blogPost = new BlogPost(_random.NextPositiveLong(), submission);
+
+            var blogPost = new BlogPost(_random.NextPositiveLong(), userId.Value, submission);
 
             _posts.Add(blogPost);
 
@@ -54,7 +57,19 @@ namespace BrainDump.Controllers {
 
         [Authorize]
         [HttpDelete("{id}")]
-        public void Delete(int id) {
+        public IActionResult Delete(long id) {
+            var userId = HttpContext.GetUserId();
+            if (userId == null) {
+                return BadRequest();
+            }
+            var blogPost = _posts.Find(id);
+
+            if (blogPost == null || userId == null || blogPost.UserId != userId) {
+                return Forbid();
+            }
+
+            _posts.Remove(id);
+            return Ok();
         }
     }
 }
