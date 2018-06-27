@@ -31,7 +31,7 @@ namespace BrainDump.Controllers {
                 return Unauthorized();
             }
 
-            return Ok(new { token });
+            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
         }
 
         [HttpPost]
@@ -42,7 +42,7 @@ namespace BrainDump.Controllers {
             }
        
             var token = _authManager.CreateUser(request.UserName, request.Password);
-            return Ok(new { token });
+            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
         }
     }
 }
