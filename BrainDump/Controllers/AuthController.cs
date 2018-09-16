@@ -27,7 +27,7 @@ namespace BrainDump.Controllers {
             JwtSecurityToken token;
             try {
                 token = _authManager.Login(request.UserName, request.Password);
-            } catch (InvalidCredentialsException e) {
+            } catch (InvalidCredentialsException) {
                 return Unauthorized();
             }
 
@@ -40,9 +40,13 @@ namespace BrainDump.Controllers {
             if (request == null) {
                 return BadRequest();
             }
-       
-            var token = _authManager.CreateUser(request.UserName, request.Password);
-            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+
+            try {
+                var token = _authManager.CreateUser(request.UserName, request.Password);
+                return Ok(new {token = new JwtSecurityTokenHandler().WriteToken(token)});
+            } catch (DuplicateUserException) {
+                return BadRequest("User already exists");
+            }
         }
     }
 }

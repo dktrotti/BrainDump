@@ -8,12 +8,16 @@ using System.Text;
 using System.Threading.Tasks;
 using BrainDump.data;
 using BrainDump.util;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 
 namespace BrainDump.Models.Auth {
     public class AuthorizationManager {
+        private static readonly TimeSpan ExpirationTime = TimeSpan.FromMinutes(30);
+
         private readonly IUserRepository _users;
         private readonly IConfiguration _configuration;
         private readonly RNGCryptoServiceProvider _secureRandom;
@@ -30,17 +34,40 @@ namespace BrainDump.Models.Auth {
             _random = random;
         }
 
+        public static void ConfigureAccessBearer(
+            JwtBearerOptions options,
+            IConfiguration configuration) {
+            options.TokenValidationParameters = new TokenValidationParameters {
+                ValidAudience = configuration["domain"],
+                // Tokens are being created locally, so there should be zero skew
+                ClockSkew = TimeSpan.Zero,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true,
+                SaveSigninToken = false,
+                ValidateActor = false,
+                ValidateAudience = true,
+                ValidateIssuer = false,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(configuration["authSigningKey"]))
+            };
+        }
+
         public JwtSecurityToken CreateUser(string username, string password) {
             byte[] salt = new byte[128 / 8];
             _secureRandom.GetBytes(salt);
 
             byte[] hash = hashPassword(password, salt);
 
-            _users.Add(new User(
-                username,
-                _random.NextPositiveLong(),
-                Convert.ToBase64String(salt),
-                Convert.ToBase64String(hash)));
+            try {
+                _users.Add(new User(
+                    username,
+                    _random.NextPositiveLong(),
+                    Convert.ToBase64String(salt),
+                    Convert.ToBase64String(hash)));
+            } catch (MongoWriteException) {
+                throw new DuplicateUserException();
+            }
 
             return Login(username, password);
         }
@@ -54,39 +81,58 @@ namespace BrainDump.Models.Auth {
             var userHash = Convert.FromBase64String(user.Hash);
             var salt = Convert.FromBase64String(user.Salt);
             if (userHash.slowEquals(hashPassword(password, salt))) {
-                return createSecurityToken(user);
+                return CreateAccessToken(user);
             } else {
                 throw new InvalidCredentialsException();
             }
         }
 
-        private byte[] hashPassword(string password, byte[] salt) {
-            return KeyDerivation.Pbkdf2(
-                password: password,
-                salt: salt,
-                prf: KeyDerivationPrf.HMACSHA256,
-                iterationCount: 10000,
-                numBytesRequested: 256 / 8);
-        }
-
-        private JwtSecurityToken createSecurityToken(User user) {
-            var key = new SymmetricSecurityKey(Convert.FromBase64String(_configuration["authSigningKey"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        private JwtSecurityToken RefreshAccessToken(JwtSecurityToken token) {
+            if (token.ValidTo < DateTime.UtcNow) {
+                throw new SecurityTokenExpiredException();
+            }
 
             return new JwtSecurityToken(
-                claims: new List<Claim> {
-                    new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim(CustomClaims.BraindumpUserId, user.UserId.ToString())
-                },
-                signingCredentials: creds);
+                claims: token.Claims,
+                expires: DateTime.UtcNow.Add(ExpirationTime),
+                signingCredentials: GetSigningCredentials());
+        }
+
+        private JwtSecurityToken CreateAccessToken(User user) {
+            var claims = new List<Claim> {
+                new Claim(CustomClaimTypes.Username, user.UserName),
+                new Claim(CustomClaimTypes.UserId, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, _random.NextPositiveLong().ToString())
+            };
+
+            return new JwtSecurityToken(
+                claims: claims,
+                audience: _configuration["domain"],
+                expires: DateTime.UtcNow.Add(ExpirationTime),
+                signingCredentials: GetSigningCredentials());
+        }
+
+        private SigningCredentials GetSigningCredentials() {
+            var key = new SymmetricSecurityKey(Convert.FromBase64String(_configuration["authSigningKey"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            return creds;
+        }
+
+        private byte[] hashPassword(string password, byte[] salt) {
+            return KeyDerivation.Pbkdf2(
+                password,
+                salt,
+                KeyDerivationPrf.HMACSHA256,
+                10000,
+                256 / 8);
         }
     }
 
-    public static class CustomClaims {
-        public const String BraindumpUserId = "bdUserId";
+    public static class CustomClaimTypes {
+        public const string Username = "BrainDumpUsername";
+        public const string UserId = "BrainDumpUserId";
     }
 
-    public class InvalidCredentialsException : Exception {
-        public InvalidCredentialsException() : base() { }
-    }
+    public class InvalidCredentialsException : Exception { }
+    public class DuplicateUserException : Exception { }
 }

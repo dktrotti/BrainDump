@@ -29,6 +29,10 @@ namespace BrainDump.Models {
             _authDatabase.GetCollection<User>("users").Indexes.CreateOne(
                 Builders<User>.IndexKeys.Ascending(_ => _.UserName),
                 new CreateIndexOptions<User>() { Unique = true });
+
+            _authDatabase.GetCollection<AccessToken>("accessTokens").Indexes.CreateOne(
+                Builders<AccessToken>.IndexKeys.Ascending(_ => _.TokenId),
+                new CreateIndexOptions<AccessToken>() { Unique = true });
         }
 
         public IPostsRepository GetPostsRepository() {
@@ -37,6 +41,10 @@ namespace BrainDump.Models {
 
         public IUserRepository GetUserRepository() {
             return new UserRepository(_authDatabase.GetCollection<User>("users"));
+        }
+
+        public ITokenRepository GetTokenRepository() {
+            return new TokenRepository(_authDatabase.GetCollection<AccessToken>("refreshTokens"));
         }
     }
 }
