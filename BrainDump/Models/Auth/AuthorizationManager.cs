@@ -8,8 +8,10 @@ using System.Text;
 using System.Threading.Tasks;
 using BrainDump.data;
 using BrainDump.util;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
@@ -43,7 +45,7 @@ namespace BrainDump.Models.Auth {
                 ClockSkew = TimeSpan.Zero,
                 RequireExpirationTime = true,
                 RequireSignedTokens = true,
-                SaveSigninToken = false,
+                SaveSigninToken = true,
                 ValidateActor = false,
                 ValidateAudience = true,
                 ValidateIssuer = false,
@@ -87,7 +89,9 @@ namespace BrainDump.Models.Auth {
             }
         }
 
-        private JwtSecurityToken RefreshAccessToken(JwtSecurityToken token) {
+        public async Task<JwtSecurityToken> RefreshAccessToken(HttpContext context) {
+            var token = new JwtSecurityToken(await context.GetTokenAsync("access_token"));
+
             if (token.ValidTo < DateTime.UtcNow) {
                 throw new SecurityTokenExpiredException();
             }
